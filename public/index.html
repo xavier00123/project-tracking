@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文档 vs 代码 差异分析</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>📋 文档 ↔ 代码 差异分析</h1>
+  <p class="subtitle">检查项目文档承诺的功能与实际代码实现的差距</p>
+</header>
+
+<main>
+  <!-- 配置区 -->
+  <section class="card config">
+    <div class="row">
+      <label class="field grow">
+        <span>项目目录</span>
+        <input id="projectDir" type="text" placeholder="/path/to/your/project" autocomplete="off">
+      </label>
+      <button id="pickBtn" class="btn secondary">📂 浏览…</button>
+      <button id="scanBtn" class="btn secondary">预扫描</button>
+      <button id="analyzeBtn" class="btn primary">开始分析</button>
+    </div>
+    <div class="row">
+      <button id="toggleAdv" class="link">⚙ 分析设置</button>
+      <span id="scanInfo" class="muted"></span>
+    </div>
+    <div id="advPanel" class="adv hidden">
+      <div class="row">
+        <label class="field"><span>分析模式</span>
+          <select id="mode">
+            <option value="devin">Devin 模型（推荐）</option>
+            <option value="local">本地启发式（无需登录）</option>
+          </select></label>
+        <label class="field"><span>模型（可选，默认跟随 Devin 配置）</span>
+          <input id="model" type="text" placeholder="如 swe / opus / sonnet"></label>
+      </div>
+      <div class="row"><span id="devinStatus" class="muted">检测 Devin CLI 状态中…</span></div>
+    </div>
+  </section>
+
+  <!-- 进度 -->
+  <section id="progressCard" class="card hidden">
+    <h2>分析进度</h2>
+    <ul id="progressLog" class="log"></ul>
+  </section>
+
+  <!-- 结果 -->
+  <section id="resultCard" class="hidden">
+    <div class="kpis">
+      <div class="kpi"><div id="kpiCoverage" class="kpi-num">-</div><div class="kpi-label">文档功能覆盖率</div></div>
+      <div class="kpi ok"><div id="kpiImpl" class="kpi-num">-</div><div class="kpi-label">已实现</div></div>
+      <div class="kpi warn"><div id="kpiPartial" class="kpi-num">-</div><div class="kpi-label">部分实现</div></div>
+      <div class="kpi bad"><div id="kpiMissing" class="kpi-num">-</div><div class="kpi-label">未实现</div></div>
+      <div class="kpi"><div id="kpiUncertain" class="kpi-num">-</div><div class="kpi-label">不确定</div></div>
+    </div>
+
+    <div class="charts">
+      <div id="chartStatus" class="chart"></div>
+      <div id="chartByDoc" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <h2>功能点明细</h2>
+        <div id="filters" class="filters">
+          <button data-f="all" class="chip active">全部</button>
+          <button data-f="implemented" class="chip">已实现</button>
+          <button data-f="partial" class="chip">部分实现</button>
+          <button data-f="missing" class="chip">未实现</button>
+          <button data-f="uncertain" class="chip">不确定</button>
+        </div>
+      </div>
+      <table id="featureTable">
+        <thead><tr>
+          <th>功能点</th><th>来源文档</th><th>状态</th><th>置信度</th><th>代码证据</th><th>说明</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="undocCard" class="card hidden">
+      <h2>代码中有但文档未提及</h2>
+      <ul id="undocList"></ul>
+    </div>
+  </section>
+</main>
+
+<footer><span id="metaInfo" class="muted"></span></footer>
+<script src="app.js"></script>
+</body>
+</html>

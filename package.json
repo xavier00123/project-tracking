@@ -1,0 +1,13 @@
+{
+  "name": "doc-code-diff-tracker",
+  "version": "1.0.0",
+  "description": "可视化检查项目文档功能与实际代码差异的工具",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
