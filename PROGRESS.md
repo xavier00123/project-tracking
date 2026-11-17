@@ -7,7 +7,7 @@
 | 模块 | 状态 | 备注 |
 |---|---|---|
 | lib/browser.js | ✅ | playwright-core + channel:'chrome'（免下载浏览器）；截图 / aria snapshot 元素盘点 / console+网络错误捕获 |
-| lib/runner.js | ✅ | URL 模式 + launch 模式（qa.config.json > package.json scripts）；stdout 端口解析 + 常用端口探测（排除预存在服务）；进程组清理已验证 |
+| lib/runner.js | ✅ | URL 模式 + launch 模式（qa.config.json > 多技术栈探测：package.json / Maven / Gradle / Python / Go / Rust / Makefile，含 monorepo ≤3 层子目录递归、候选打分取最优）；stdout 端口解析（URL / `port(s):` / listening on）+ 常用端口探测（排除预存在服务）；进程组清理已验证 |
 | lib/cases.js | ✅ | devin 提取 pages+cases（step 含 role/nth、去重首跳）；local 启发式（角色按"名字后最近 UI 词"归属） |
 | lib/execute.js | ✅ | 步骤确定性执行；role→label→placeholder→text→同角色 nth 兜底链；6 类断言 |
 | lib/vision.js | ✅ | `devin -p` cwd=截图目录读 PNG；purpose / elements / expectedFound / expectedMissing / anomalies |
@@ -38,6 +38,8 @@
 9. 进度加密：devinStatus 前提示、判定分批报"批次 x/n"、巡检报 HTTP 码/元素数/缺失数、LLM 调用注明"通常需 1-3 分钟"
 10. **agent 动作实时可见**：`chat()` 加 `--export` ATIF 文件，`tailExport` 每 1.2s 轮询并流式提取完整 step（文件运行中不闭合，按括号平衡逐个解析），emit `🔧 工具调用` 和 `💭 推理叙述`；15s 心跳兜底思考空窗
 11. **判定批次并发化**：judgeFeatures 按 3 路并发跑批（约 3x 提速），批次 emit 含功能点数/证据段数；顺带修复 undocumented 每批覆盖 → 跨批合并去重
+12. **批次 JSON 解析失败整批作废** → 判定带重试一次；仍失败则该批降级（功能点落 uncertain）不再拖垮整个 run；parseJson 预处理常见脏输出（fence/尾逗号/控制字符）
+13. **非 Node 项目无法启动** → detectLaunch 重构为 probeDir + monorepo 递归（≤3 层，跳过 node_modules 等），候选按分数择优（dev serve 脚本 10 > dev:* 6 > Maven/Gradle 4 > Python/Go 3 > Makefile 2）；stdout 端口解析放宽支持 `Tomcat started on port(s): 8080`、Netty、Uvicorn 等日志；detected.dir 作为 spawn cwd
 
 ## e2e 实测结果（demo-app）
 

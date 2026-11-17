@@ -9,7 +9,7 @@
 ## 工作原理（动态验收测试）
 
 1. **连接目标**：填"已运行 URL"直接连；或填项目目录自动探测启动方式
-   （`qa.config.json` > `package.json` 的 dev/start 脚本），spawn 进程并轮询端口就绪。
+   （`qa.config.json` > 多技术栈探测），spawn 进程并轮询端口就绪。
 2. **提取验收标准**（Devin 模型）：从文档提取页面清单、预期元素、可执行用例
    （结构化步骤 goto/click/fill/press + 断言 urlContains/textVisible/valueEquals 等）。
 3. **页面巡检**：Playwright 逐路由访问 → 截图 → aria snapshot 元素盘点 →
@@ -28,11 +28,25 @@
 | `missing` | 入口/页面本身不存在（404、导航失败） |
 | `untestable` | 交互元素缺失，无法到达验证点 |
 
+### 自动探测的启动方式
+
+`qa.config.json` > 自动探测（按优先级取最优候选）：
+
+- `package.json` 的 `dev` / `serve` / `preview` / `start` 脚本（含 `dev:h5` 等带前缀脚本）
+- Java/Kotlin：`mvnw`/`pom.xml`（`spring-boot:run`）、`gradlew`/`build.gradle`（`bootRun`）
+- Python：`manage.py` / `app.py` / `main.py` / `server.py` / `run.py`
+- Go（`go run .`）、Rust（`cargo run`）、`Makefile`（`make run`）
+
+根目录没探测到时会**递归 ≤3 层子目录**（monorepo 支持），同分时优先更浅的目录。
+启动端口从 stdout 解析（支持 `Local: http://localhost:5173`、`Tomcat started on port(s): 8080`
+等格式），解析不到则探测常用端口。
+
 ### qa.config.json（可选，放目标项目根目录）
 
 ```json
 {
   "startCommand": "npm run dev",
+  "dir": "frontend/my-app",
   "port": 3000,
   "readyPath": "/",
   "env": { "NODE_ENV": "development" },
@@ -40,7 +54,7 @@
 }
 ```
 
-`preSteps` 在所有用例前执行一次（如登录）。
+`dir` 指定启动命令的工作目录（monorepo 中指定要启动的子工程）；`preSteps` 在所有用例前执行一次（如登录）。
 
 ## 工作原理（静态分析）
 
@@ -60,7 +74,7 @@ npm start          # http://localhost:3210
 
 使用只需一步：填入目标项目目录，点「开始分析」。工具将依次执行
 **静态代码比对 → 自动启动目标项目 → 浏览器页面巡检与交互验收 → 综合对账**。
-启动方式自动探测（`qa.config.json` > `package.json` 脚本）；目标已在运行的话，
+启动方式自动探测（`qa.config.json` > 多技术栈探测，含 monorepo 子目录）；目标已在运行的话，
 可在「⚙ 分析设置」里填"已运行 URL"跳过启动；也可勾选"只做静态分析"跳过动态测试。
 
 ## Devin 模型
