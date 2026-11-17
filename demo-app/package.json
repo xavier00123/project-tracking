@@ -1,0 +1,12 @@
+{
+  "name": "demo-app",
+  "version": "1.0.0",
+  "description": "验收测试演示目标：文档承诺的功能部分实现、部分缺失",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

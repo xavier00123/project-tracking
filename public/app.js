@@ -78,17 +78,19 @@ $('#scanBtn').onclick = async () => {
 $('#analyzeBtn').onclick = async () => {
   const projectDir = $('#projectDir').value.trim();
   if (!projectDir) return alert('请先填写项目目录');
-  for (const id of ['projectDir', 'model', 'mode']) {
+  for (const id of ['projectDir', 'model', 'mode', 'dynUrl']) {
     localStorage.setItem('dcdt.' + id, $('#' + id).value.trim());
   }
 
   $('#analyzeBtn').disabled = true;
   $('#progressCard').classList.remove('hidden');
   $('#resultCard').classList.add('hidden');
+  $('#dynResultCard').classList.add('hidden');
   $('#progressLog').innerHTML = '';
-  log('开始分析…');
 
   try {
+    // 阶段 1：静态 文档↔代码 分析
+    log('阶段 1/2：静态分析（文档 ↔ 代码）…');
     const res = await fetch('/api/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -104,9 +106,35 @@ $('#analyzeBtn').onclick = async () => {
     });
   } catch (e) {
     log('请求失败：' + e.message, true);
-  } finally {
-    $('#analyzeBtn').disabled = false;
   }
+
+  // 阶段 2：动态验收测试（自动探测启动方式；失败则跳过并提示）
+  if (!$('#dynSkip').checked) {
+    try {
+      log('阶段 2/2：动态验收测试（自动启动目标项目）…');
+      const res = await fetch('/api/test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectDir,
+          url: $('#dynUrl').value.trim() || undefined,
+          mode: $('#mode').value,
+          model: $('#model').value.trim() || undefined,
+          vision: $('#dynVision').checked,
+        }),
+      });
+      await readSSE(res, (event, data) => {
+        if (event === 'progress') log(data.msg);
+        else if (event === 'error') {
+          log('动态测试未完成：' + data.error + '（静态分析结果不受影响）', true);
+        }
+        else if (event === 'result') { renderDynResult(data); refreshRuns(); }
+      });
+    } catch (e) {
+      log('动态测试请求失败：' + e.message + '（静态分析结果不受影响）', true);
+    }
+  }
+
+  $('#analyzeBtn').disabled = false;
 };
 
 function log(msg, isErr) {
@@ -255,6 +283,155 @@ $('#filters').addEventListener('click', e => {
 });
 
 window.addEventListener('resize', () => charts.forEach(c => c.resize()));
+
+/* ==================== 动态验收测试 ==================== */
+
+const DYN_LABEL = { verified: '验证通过', divergent: '与文档不符', missing: '未实现', untestable: '无法测试' };
+let dynResult = null;
+let dynFilter = 'all';
+
+{
+  const v = localStorage.getItem('dcdt.dynUrl');
+  if (v) $('#dynUrl').value = v;
+}
+
+// 选项联动：只做静态 → 禁用 URL/视觉；本地模式无 devin → 禁用视觉
+function syncDynOptions() {
+  const skip = $('#dynSkip').checked;
+  const local = $('#mode').value === 'local';
+  $('#dynUrl').disabled = skip;
+  $('#dynVision').disabled = skip || local;
+  $('#dynVision').parentElement.title =
+    local ? '本地模式不调用 Devin，无视觉复核' : (skip ? '已勾选只做静态分析' : '');
+}
+$('#dynSkip').onchange = syncDynOptions;
+$('#mode').onchange = syncDynOptions;
+syncDynOptions();
+
+async function refreshRuns(selectId) {
+  try {
+    const runs = await (await fetch('/api/runs')).json();
+    $('#dynRuns').innerHTML = '<option value="">（选择历史记录）</option>' +
+      runs.map(r => `<option value="${r.id}">${r.id} · ${r.targetUrl || r.project || ''} · 通过${r.summary?.verified ?? '-'}/${r.summary?.casesTotal ?? '-'}</option>`).join('');
+    if (selectId) $('#dynRuns').value = selectId;
+  } catch {}
+}
+refreshRuns();
+
+$('#dynRuns').onchange = async e => {
+  if (!e.target.value) return;
+  try {
+    const r = await (await fetch('/api/runs/' + e.target.value)).json();
+    if (r.error) throw new Error(r.error);
+    renderDynResult(r);
+  } catch (err) { alert('加载历史记录失败：' + err.message); }
+};
+
+function renderDynResult(r) {
+  dynResult = r;
+  const s = r.summary || {};
+  $('#dynResultCard').classList.remove('hidden');
+  $('#dkPages').textContent = `${s.pagesOk ?? 0}/${s.pagesTotal ?? 0}`;
+  $('#dkVerified').textContent = s.verified ?? 0;
+  $('#dkDivergent').textContent = s.divergent ?? 0;
+  $('#dkMissing').textContent = s.missing ?? 0;
+  $('#dkUntestable').textContent = s.untestable ?? 0;
+  $('#dkRate').textContent = (s.verifiedRate ?? 0) + '%';
+  $('#metaInfo').textContent =
+    `目标：${r.targetUrl || '-'} · 项目：${r.project || '-'} · 模式：${r.mode} · ${new Date(r.finishedAt || r.startedAt).toLocaleString()}`;
+
+  renderPageGallery(r.pages || []);
+  renderCaseTable(r.cases || []);
+  renderMerge(r);
+  $('#dynResultCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function shotLink(runId, rel, label) {
+  if (!rel) return '';
+  return `<a href="/runs/${runId}/${rel}" target="_blank" class="shotlink">${label || '📷'}</a>`;
+}
+
+function renderPageGallery(pages) {
+  const g = $('#pageGallery');
+  g.innerHTML = '';
+  for (const p of pages) {
+    const card = document.createElement('div');
+    card.className = 'pgcard' + (p.ok ? '' : ' bad');
+    const elems = (p.interactive || []).slice(0, 20)
+      .map(e => `<span class="echip">${e.role}${e.name ? ' "' + escapeHtml(e.name) + '"' : ''}</span>`).join('');
+    const miss = (p.missingExpected || [])
+      .map(e => `<span class="echip miss">${e.role} "${escapeHtml(e.name)}" 未找到</span>`).join('');
+    const anom = (p.anomalies || []).map(a => `<div class="anom">⚠ ${escapeHtml(a)}</div>`).join('');
+    const errs = (p.consoleErrors || []).map(a => `<div class="anom">console: ${escapeHtml(a)}</div>`).join('');
+    card.innerHTML =
+      `<div class="pghead"><span class="fname">${escapeHtml(p.name || p.route)}</span>` +
+      `<span class="muted">${escapeHtml(p.route)}</span>` +
+      (p.httpStatus ? `<span class="badge ${p.ok ? 'implemented' : 'missing'}">${p.httpStatus}</span>` : '') + `</div>` +
+      (p.shot ? `<a href="/runs/${dynResult.runId}/${p.shot}" target="_blank"><img class="pgshot" src="/runs/${dynResult.runId}/${p.shot}" loading="lazy"></a>` : '') +
+      (p.vision?.purpose ? `<div class="fdesc">🔍 ${escapeHtml(p.vision.purpose)}</div>` : '') +
+      (p.error ? `<div class="anom">✗ ${escapeHtml(p.error)}</div>` : '') +
+      `<div class="echips">${elems || '<span class="muted">未提取到元素</span>'}</div>` +
+      (miss ? `<div class="echips">${miss}</div>` : '') +
+      anom + errs;
+    g.appendChild(card);
+  }
+}
+
+function renderCaseTable(cases) {
+  const tbody = $('#caseTable tbody');
+  tbody.innerHTML = '';
+  for (const c of cases) {
+    if (dynFilter !== 'all' && c.status !== dynFilter) continue;
+    const tr = document.createElement('tr');
+    const asserts = (c.assertions || []).map(a =>
+      `<div class="${a.pass ? 'aok' : 'afail'}">${a.pass ? '✓' : '✗'} ${a.type} ${escapeHtml(a.expected || '')}` +
+      (a.actual ? ` <span class="muted">→ ${escapeHtml(a.actual)}</span>` : '') + `</div>`).join('');
+    const steps = (c.steps || []).map(s =>
+      `<div class="${s.ok ? 'aok' : 'afail'}">${s.ok ? '✓' : '✗'} ${escapeHtml(s.desc)}` +
+      (s.error ? ` <span class="muted">${escapeHtml(s.error)}</span>` : '') + `</div>`).join('');
+    const shots = [
+      ...(c.steps || []).filter(s => s.shot).map((s, i) => shotLink(dynResult.runId, s.shot, `步骤${i + 1}`)),
+      shotLink(dynResult.runId, c.finalShot, '结果'),
+    ].filter(Boolean).join(' ');
+    tr.innerHTML =
+      `<td><div class="fname">${escapeHtml(c.name)}</div>` +
+      (c.quote ? `<div class="fquote">"${escapeHtml(c.quote)}"</div>` : '') +
+      (c.source ? `<div class="fdesc">${escapeHtml(c.source)}</div>` : '') +
+      `<div class="steps">${steps}</div></td>` +
+      `<td class="evidence">${escapeHtml(c.expected || '')}</td>` +
+      `<td>${asserts || '<span class="muted">-</span>'}</td>` +
+      `<td><span class="badge ${c.status}">${DYN_LABEL[c.status] || c.status}</span></td>` +
+      `<td>${shots}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// 静态 × 动态 按来源文档对账
+function renderMerge(dyn) {
+  const card = $('#mergeCard');
+  if (!lastResult?.features?.length || !dyn?.cases?.length) { card.classList.add('hidden'); return; }
+  const byDoc = {};
+  const bucket = d => (byDoc[d] = byDoc[d] || { static: { implemented: 0, partial: 0, missing: 0, uncertain: 0 }, dyn: { verified: 0, divergent: 0, missing: 0, untestable: 0 } });
+  for (const f of lastResult.features) bucket(f.source || '(未知)').static[f.status]++;
+  for (const c of dyn.cases) bucket(c.source || '(未知)').dyn[c.status]++;
+  const tbody = $('#mergeTable tbody');
+  tbody.innerHTML = '';
+  for (const [doc, b] of Object.entries(byDoc)) {
+    const st = Object.entries(b.static).filter(([, v]) => v).map(([k, v]) => `${STATUS_LABEL[k]}×${v}`).join(' ') || '-';
+    const dy = Object.entries(b.dyn).filter(([, v]) => v).map(([k, v]) => `${DYN_LABEL[k]}×${v}`).join(' ') || '-';
+    tbody.innerHTML += `<tr><td class="evidence">${escapeHtml(doc)}</td><td>${st}</td><td>${dy}</td></tr>`;
+  }
+  card.classList.remove('hidden');
+}
+
+$('#dynFilters').addEventListener('click', e => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  document.querySelectorAll('#dynFilters .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  dynFilter = btn.dataset.f;
+  if (dynResult) renderCaseTable(dynResult.cases || []);
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c =>

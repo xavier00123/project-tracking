@@ -41,7 +41,14 @@
           <input id="model" type="text" list="modelList" placeholder="检测中…">
           <datalist id="modelList"></datalist></label>
       </div>
+      <div class="row">
+        <label class="field grow"><span>已运行 URL（可选；留空则自动启动项目）</span>
+          <input id="dynUrl" type="text" placeholder="http://localhost:3000" autocomplete="off"></label>
+        <label class="checkline"><input id="dynVision" type="checkbox" checked> Devin 视觉复核截图</label>
+        <label class="checkline"><input id="dynSkip" type="checkbox"> 只做静态分析</label>
+      </div>
       <div class="row"><span id="devinStatus" class="muted">检测 Devin CLI 状态中…</span></div>
+      <div class="row"><span class="muted">「开始分析」将依次执行：静态代码比对 → 自动启动目标项目 → 浏览器页面巡检与交互验收 → 综合对账。动态部分无需配置，启动方式自动探测。</span></div>
     </div>
   </section>
 
@@ -88,6 +95,54 @@
     <div id="undocCard" class="card hidden">
       <h2>代码中有但文档未提及</h2>
       <ul id="undocList"></ul>
+    </div>
+  </section>
+
+  <!-- 动态验收测试结果 -->
+  <section id="dynResultCard" class="hidden">
+    <div class="kpis">
+      <div class="kpi ok"><div id="dkPages" class="kpi-num">-</div><div class="kpi-label">页面可达</div></div>
+      <div class="kpi ok"><div id="dkVerified" class="kpi-num">-</div><div class="kpi-label">验证通过</div></div>
+      <div class="kpi warn"><div id="dkDivergent" class="kpi-num">-</div><div class="kpi-label">与文档不符</div></div>
+      <div class="kpi bad"><div id="dkMissing" class="kpi-num">-</div><div class="kpi-label">未实现</div></div>
+      <div class="kpi"><div id="dkUntestable" class="kpi-num">-</div><div class="kpi-label">无法测试</div></div>
+      <div class="kpi"><div id="dkRate" class="kpi-num">-</div><div class="kpi-label">验收通过率</div></div>
+    </div>
+
+    <div id="mergeCard" class="card hidden">
+      <h2>静态 × 动态 综合对账（按来源文档）</h2>
+      <table id="mergeTable">
+        <thead><tr><th>文档</th><th>静态判定</th><th>动态验收</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <h2>页面巡检（截图 + 元素盘点）</h2>
+        <label class="field"><span>历史记录</span>
+          <select id="dynRuns"><option value="">（选择历史记录）</option></select></label>
+      </div>
+      <div id="pageGallery" class="gallery"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <h2>验收用例（预期 vs 真实结果）</h2>
+        <div id="dynFilters" class="filters">
+          <button data-f="all" class="chip active">全部</button>
+          <button data-f="verified" class="chip">通过</button>
+          <button data-f="divergent" class="chip">不符</button>
+          <button data-f="missing" class="chip">未实现</button>
+          <button data-f="untestable" class="chip">无法测试</button>
+        </div>
+      </div>
+      <table id="caseTable">
+        <thead><tr>
+          <th>用例</th><th>预期结果</th><th>真实结果</th><th>状态</th><th>证据</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
   </section>
 </main>
