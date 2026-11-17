@@ -22,12 +22,18 @@ $('#toggleAdv').onclick = () => $('#advPanel').classList.toggle('hidden');
     const el = $('#devinStatus');
     if (!s.available) {
       el.textContent = '⚠ 未检测到 devin CLI，将不可用 Devin 模型（可选本地模式）';
+      $('#model').placeholder = '仅 Devin 模式可用';
     } else if (!s.authed) {
       el.textContent = '⚠ devin CLI 未登录：请在终端运行 `devin auth login` 后再用 Devin 模式，或改用本地模式';
       el.style.color = '#ffc857';
+      $('#model').placeholder = '需登录后可用';
     } else {
       el.textContent = `✓ Devin CLI 就绪（${s.detail || '已登录'}）`;
       el.style.color = '#3ddc97';
+      const mi = $('#model');
+      if (s.defaultModel) mi.placeholder = `默认：${s.defaultModel}`;
+      if (s.models?.length) $('#modelList').innerHTML =
+        s.models.map(m => `<option value="${m}">`).join('');
     }
   } catch {
     $('#devinStatus').textContent = 'Devin CLI 状态检测失败';

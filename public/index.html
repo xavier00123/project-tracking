@@ -37,8 +37,9 @@
             <option value="devin">Devin 模型（推荐）</option>
             <option value="local">本地启发式（无需登录）</option>
           </select></label>
-        <label class="field"><span>模型（可选，默认跟随 Devin 配置）</span>
-          <input id="model" type="text" placeholder="如 swe / opus / sonnet"></label>
+        <label class="field"><span>模型（可选，留空用当前默认）</span>
+          <input id="model" type="text" list="modelList" placeholder="检测中…">
+          <datalist id="modelList"></datalist></label>
       </div>
       <div class="row"><span id="devinStatus" class="muted">检测 Devin CLI 状态中…</span></div>
     </div>

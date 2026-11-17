@@ -67,6 +67,16 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; color: #8b93a7; font-weight: 500; padding: 8px 10px; border-bottom: 1px solid #2c3550; font-size: 12px; }
 td { padding: 10px; border-bottom: 1px solid #1e2537; vertical-align: top; }
 tr:hover td { background: #1a2133; }
+
+/* 固定布局 + 强制换行，防止长路径/长文本撑破卡片 */
+#featureTable { table-layout: fixed; }
+#featureTable th, #featureTable td { overflow-wrap: anywhere; word-break: break-word; }
+#featureTable th:nth-child(1) { width: 25%; }
+#featureTable th:nth-child(2) { width: 12%; }
+#featureTable th:nth-child(3) { width: 9%; }
+#featureTable th:nth-child(4) { width: 8%; }
+#featureTable th:nth-child(5) { width: 28%; }
+/* 第 6 列（说明）占剩余宽度 */
 .badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .badge.implemented { background: rgba(61,220,151,.15); color: #3ddc97; }
 .badge.partial { background: rgba(255,200,87,.15); color: #ffc857; }
